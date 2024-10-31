@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mapa de Sismos</title>
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.0/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.datatables.net/2.1.8/css/dataTables.bootstrap5.css"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet-draw/dist/leaflet.draw.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/gh/ljagis/leaflet-measure@2.1.7/dist/leaflet-measure.min.css"
+    />
+    <style>
+      #map {
+        height: 600px;
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container mt-4">
+      <h1 class="text-center">Mapa de Sismos</h1>
+      <div id="map" class="mb-4"></div>
+
+      <h2 class="text-center">Registro de los últimos 30 días</h2>
+      <table id="sismosTable" class="table table-striped table-bordered">
+        <thead>
+          <tr>
+            <th class="text-center">Registro del Sismo</th>
+            <th class="text-center">Provincia</th>
+            <th class="text-center">Magnitud</th>
+            <th class="text-center">Coordenadas</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for sismo in sismos %}
+          <tr
+            data-coordinates="{{ sismo.coordenadas }}"
+            data-registro="{{ sismo.registro }}"
+          >
+            <td class="text-center">{{ sismo.registro }}</td>
+            <td class="text-center">{{ sismo.provincia }}</td>
+            <td class="text-center">{{ sismo.magnitud }}</td>
+            <td class="text-center">{{ sismo.coordenadas }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.7.1.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.datatables.net/2.1.8/js/dataTables.js"></script>
+    <script src="https://cdn.datatables.net/2.1.8/js/dataTables.bootstrap5.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+    <script src="https://unpkg.com/leaflet-draw/dist/leaflet.draw.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/ljagis/leaflet-measure@2.1.7/dist/leaflet-measure.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.2/moment.min.js"></script>
+
+    <script>
+        // Crear el mapa
+        var map = L.map("map").setView([-31.0, -64.7597], 5); // Coordenadas de Argentina
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            maxZoom: 20,
+        }).addTo(map);
+
+        // Agregar marcadores desde los datos del servidor
+        var sismos = {{ sismos | tojson }};
+        var markers = {}; // Almacenar los marcadores en un objeto
+
+        sismos.forEach(function(sismo) {
+            var coords = sismo.coordenadas.split(', ');
+            var lat = parseFloat(coords[0]);
+            var lon = parseFloat(coords[1]);
+            var popupContent = `
+                <h2>${sismo.provincia}</h2>
+                <h4>${sismo.registro}</h4>
+                <h5>Magnitud: ${sismo.magnitud}</h5>
+                <p>Epicentro: ${lat}º Sur; ${lon}º Oeste</p>
+                <p>Profundidad: ${sismo.profundidad} km</p>
+            `;
+            var marker = L.circleMarker([lat, lon], {
+                radius: 10,
+                color: "black",
+                weight: 1.2,
+                fillColor: getColor(sismo.magnitud),
+                fillOpacity: 0.7,
+            }).addTo(map).bindPopup(popupContent);
+
+            // Almacenar el marcador en el objeto de markers usando el registro como clave
+            markers[sismo.registro] = marker;
+            sismo.marker = marker; // Agregar marcador al objeto sismo
+        });
+
+        // Función para determinar el color según la magnitud
+        function getColor(magnitude) {
+            if (magnitude >= 9.0) return "darkpurple";
+            if (magnitude >= 8.0) return "purple";
+            if (magnitude >= 7.0) return "darkred";
+            if (magnitude >= 6.0) return "red";
+            if (magnitude >= 5.0) return "orange";
+            if (magnitude >= 4.0) return "darkgreen";
+            if (magnitude >= 3.0) return "green";
+            if (magnitude >= 2.0) return "cadetblue";
+            if (magnitude >= 1.0) return "blue";
+            return "lightgray";
+        }
+
+        // Inicializar DataTable desactivando el ordenamiento
+        $(document).ready(function() {
+            $('#sismosTable').DataTable({
+                order: [],
+                columnDefs: [
+                    { orderable: false, targets: [0, 1, 2, 3] } // Desactivar el ordenamiento en todas las columnas
+                ],
+                language: {
+                    url: '/static/es-ES.json' // Ruta al archivo local
+                },
+            });
+        });
+
+        // Evento de clic en las filas de la tabla
+        $('#sismosTable tbody').on('click', 'tr', function() {
+            // Obtener el registro del sismo
+            var registro = $(this).data('registro');
+
+            // Si la fila ya tiene la clase 'selected', quitarla
+            if ($(this).hasClass('selected')) {
+                $(this).removeClass('selected');
+
+                // Restaurar todos los marcadores al estado original
+                for (const key in markers) {
+                    markers[key].setStyle({fillOpacity: 0.7 }); // Restaurar opacidad
+                }
+            } else {
+                // Quitar 'selected' de cualquier fila
+                $('#sismosTable tbody tr.selected').removeClass('selected');
+                $(this).addClass('selected');
+
+                // Obtener las coordenadas del atributo 'data-coordinates'
+                var coordinates = $(this).data('coordinates').split(', ');
+                var lat = parseFloat(coordinates[0]);
+                var lon = parseFloat(coordinates[1]);
+
+                // Centrar el mapa en las coordenadas y hacer zoom
+                map.setView([lat, lon], 12);
+
+                // Ajustar la opacidad de los marcadores
+                for (const key in markers) {
+                    if (key !== registro) {
+                        markers[key].setStyle({ fillOpacity: 0.7}); // Atenuar el marcador
+                    } else {
+                        markers[key].openPopup(); // Abrir el popup del marcador seleccionado
+                    }
+                }
+            }
+        });
+
+        // Añadir control de geocodificación
+        var geocoder = L.Control.geocoder({
+            defaultMarkGeocode: false,
+        })
+        .on('markgeocode', function(e) {
+            var latlng = e.geocode.center;
+            map.setView(latlng, 14);
+            L.marker(latlng).addTo(map).bindPopup(e.geocode.name).openPopup();
+        })
+        .addTo(map);
+
+        // Añadir control de dibujo
+        var drawnItems = new L.FeatureGroup();
+        map.addLayer(drawnItems);
+        var drawControl = new L.Control.Draw({
+            edit: {
+                featureGroup: drawnItems
+            },
+            draw: {
+                polygon: true,
+                polyline: true,
+                circle: true,
+                rectangle: true,
+                marker: true
+            }
+        });
+        map.addControl(drawControl);
+
+        // Evento para añadir formas dibujadas al mapa
+        map.on('draw:created', function(e) {
+            var layer = e.layer;
+            drawnItems.addLayer(layer);
+        });
+
+        // Añadir control de medición
+        var measureControl = new L.Control.Measure({
+            position: 'bottomleft', // Posición del control
+            primaryLengthUnit: 'kilometers',
+            secondaryLengthUnit: 'meters',
+            primaryAreaUnit: 'hectares',
+            secondaryAreaUnit: 'ares',
+            activeColor: 'blue',
+            completedColor: 'red',
+            localization: 'es',
+        });
+        map.addControl(measureControl);
+
+
+      // Workaround for using this plugin with Leaflet>=1.8.0
+      // https://github.com/ljagis/leaflet-measure/issues/171
+          L.Control.Measure.include({
+              _setCaptureMarkerIcon: function () {
+                  // disable autopan
+                  this._captureMarker.options.autoPanOnFocus = false;
+                  // default function
+                  this._captureMarker.setIcon(
+                      L.divIcon({
+                          iconSize: this._map.getSize().multiplyBy(2)
+                      })
+                  );
+              },
+          });
+    </script>
+  </body>
+</html>
