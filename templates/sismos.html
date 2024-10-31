@@ -99,15 +99,18 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.2/moment.min.js"></script>
 
     <script>
-        // Crear el mapa
-        var map = L.map("map").setView([-31.0, -64.7597], 5); // Coordenadas de Argentina
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-            maxZoom: 20,
-        }).addTo(map);
+      // Crear el mapa
+      var map = L.map("map").setView([-31.0, -64.7597], 5); // Coordenadas de Argentina
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          maxZoom: 20,
+      }).addTo(map);
 
       // Crear un nuevo pane para los marcadores
       map.createPane('markerPane');
       map.getPane('markerPane').style.zIndex = 700; // Aseguramos que esté por encima del overlayPane
+
+      // Crear un grupo de capas para los marcadores
+      var markersLayer = L.layerGroup().addTo(map); // Crea un nuevo grupo de capas para los marcadores
 
       // Cargar el archivo GeoJSON y agregarlo al mapa
       fetch('/static/inpres_sismos_zonificacion.json') // Asegúrate de que la ruta sea correcta
@@ -118,80 +121,63 @@
               return response.json();
           })
           .then(data => {
-              // Crear una nueva capa para el GeoJSON
-              var geoJsonLayer = L.geoJSON(data, {
-                  style: function(feature) {
-                      let color;
-                      // Asignar el color según la zona
-                      switch (feature.properties.zona_sismo) {
-                          case 'Zona 4':
-                              color = '#db241d';
-                              break;
-                          case 'Zona 3':
-                              color = '#ff8b00';
-                              break;
-                          case 'Zona 2':
-                              color = '#ebbb01';
-                              break;
-                          case 'Zona 1':
-                              color = '#f4c591';
-                              break;
-                          case 'Zona 0':
-                              color = '#fef1c5';
-                              break;
-                          default:
-                              color = 'black';
-                      }
-                      return {
-                          color: color,
-                          weight: 0,
-                          fillOpacity: 0.7
-                      };
-                  },
-                  onEachFeature: function(feature, layer) {
-                      if (feature.properties && feature.properties.zona_sismo) {
-                          layer.bindPopup(feature.properties.zona_sismo);
-                      }
-                  }
-              }).addTo(map); // Añadir la capa de zonas sísmicas al mapa
+            // Crear una nueva capa para el GeoJSON
+            var geoJsonLayer = L.geoJSON(data, {
+                style: function(feature) {
+                    let color;
+                    // Asignar el color según la zona
+                    switch (feature.properties.zona_sismo) {
+                        case 'Zona 4':
+                            color = '#db241d';
+                            break;
+                        case 'Zona 3':
+                            color = '#ff8b00';
+                            break;
+                        case 'Zona 2':
+                            color = '#ebbb01';
+                            break;
+                        case 'Zona 1':
+                            color = '#f4c591';
+                            break;
+                        case 'Zona 0':
+                            color = '#fef1c5';
+                            break;
+                        default:
+                            color = 'black';
+                    }
+                    return {
+                        color: color,
+                        weight: 0,
+                        fillOpacity: 0.7
+                    };
+                },
+                onEachFeature: function(feature, layer) {
+                    if (feature.properties && feature.properties.zona_sismo) {
+                        layer.bindPopup(feature.properties.zona_sismo);
+                    }
+                }
+            }).addTo(map); // Añadir la capa de zonas sísmicas al mapa
 
-              // Agregar el control de capas
-              var baseLayers = {
-                  "OpenStreetMap": L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-                      maxZoom: 20,
-                  }).addTo(map)
-              };
+            // Agregar el control de capas
+            var baseLayers = {
+                "OpenStreetMap": L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                    maxZoom: 20,
+                }).addTo(map)
+            };
 
               var overlays = {
-                  "Zonas Sísmicas": geoJsonLayer // Añade tu capa GeoJSON aquí
+                "Zonas Sísmicas": geoJsonLayer // Añade tu capa GeoJSON aquí
               };
 
-              L.control.layers(baseLayers, overlays).addTo(map); // Agrega el control al mapa
+            L.control.layers(baseLayers, overlays).addTo(map); // Agrega el control al mapa
 
-              // Crear un FeatureGroup para los marcadores
-              markersLayer = L.featureGroup().addTo(map); // Agregar la capa de marcadores al mapa
-
-              // Cargar marcadores
-              cargarMarcadores();
-
-              // Manejar el evento de overlayadd
-              map.on('overlayadd', function(e) {
-                  if (e.name === 'Zonas Sísmicas') {
-                      // Asegurarse de que los marcadores estén visibles
-                      map.addLayer(markersLayer);
-                  }
-              });
-
-              // Manejar el evento de overlayremove
-              map.on('overlayremove', function(e) {
-                  if (e.name === 'Zonas Sísmicas') {
-                      // Asegurarse de que los marcadores estén visibles
-                      map.addLayer(markersLayer);
-                  }
-              });
           })
           .catch(error => {
               console.error('Error al cargar el GeoJSON:', error);
+          })
+          .finally(() => {
+              // Cargar marcadores independientemente del resultado de la carga del GeoJSON
+              cargarMarcadores();
           });
 
       // Función para agregar marcadores al mapa
