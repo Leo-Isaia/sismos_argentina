@@ -108,6 +108,8 @@
       // Crear un nuevo pane para los marcadores
       map.createPane('markerPane');
       map.getPane('markerPane').style.zIndex = 700; // Aseguramos que esté por encima del overlayPane
+      map.createPane('popupPane');
+      map.getPane('popupPane').style.zIndex = 800;
 
       // Crear un grupo de capas para los marcadores
       var markersLayer = L.layerGroup().addTo(map); // Crea un nuevo grupo de capas para los marcadores
@@ -203,7 +205,7 @@
                   fillColor: getColor(sismo.magnitud),
                   fillOpacity: 0.7,
                   pane: 'markerPane' // Añadir el pane a los marcadores
-              }).bindPopup(popupContent);
+              }).bindPopup(popupContent, { autoClose: true, closeOnClick: true, pane: 'popupPane' });
 
               // Añadir el marcador al FeatureGroup de marcadores
               markersLayer.addLayer(marker);
@@ -272,6 +274,8 @@
                         markers[key].openPopup(); // Abrir el popup del marcador seleccionado
                     }
                 }
+               // Aquí abrir el popup manualmente
+                markers[registro].openPopup();
             }
         });
 
