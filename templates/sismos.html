@@ -34,6 +34,28 @@
         width: 100%;
       }
     </style>
+
+    <style>
+      .info.legend {
+        background: white;
+        padding: 10px;
+        border-radius: 5px;
+        box-shadow: 0 0 5px rgba(0, 0, 0, 0.65);
+      }
+
+      .info.legend h5 {
+        margin: 0 0 5px 0;
+        font-size: 14px;
+      }
+
+      .info.legend i {
+        width: 20px;
+        height: 20px;
+        border-radius: 5px;
+        display: inline-block;
+        margin-right: 5px;
+      }
+    </style>
   </head>
   <body>
     <div class="container mt-4">
@@ -83,47 +105,139 @@
             maxZoom: 20,
         }).addTo(map);
 
-        // Agregar marcadores desde los datos del servidor
-        var sismos = {{ sismos | tojson }};
-        var markers = {}; // Almacenar los marcadores en un objeto
+      // Crear un nuevo pane para los marcadores
+      map.createPane('markerPane');
+      map.getPane('markerPane').style.zIndex = 700; // Aseguramos que esté por encima del overlayPane
 
-        sismos.forEach(function(sismo) {
-            var coords = sismo.coordenadas.split(', ');
-            var lat = parseFloat(coords[0]);
-            var lon = parseFloat(coords[1]);
-            var popupContent = `
-                <h2>${sismo.provincia}</h2>
-                <h4>${sismo.registro}</h4>
-                <h5>Magnitud: ${sismo.magnitud}</h5>
-                <p>Epicentro: ${lat}º Sur; ${lon}º Oeste</p>
-                <p>Profundidad: ${sismo.profundidad} km</p>
-            `;
-            var marker = L.circleMarker([lat, lon], {
-                radius: 10,
-                color: "black",
-                weight: 1.2,
-                fillColor: getColor(sismo.magnitud),
-                fillOpacity: 0.7,
-            }).addTo(map).bindPopup(popupContent);
+      // Cargar el archivo GeoJSON y agregarlo al mapa
+      fetch('/static/inpres_sismos_zonificacion.json') // Asegúrate de que la ruta sea correcta
+          .then(response => {
+              if (!response.ok) {
+                  throw new Error('Error al cargar el GeoJSON');
+              }
+              return response.json();
+          })
+          .then(data => {
+              // Crear una nueva capa para el GeoJSON
+              var geoJsonLayer = L.geoJSON(data, {
+                  style: function(feature) {
+                      let color;
+                      // Asignar el color según la zona
+                      switch (feature.properties.zona_sismo) {
+                          case 'Zona 4':
+                              color = '#db241d';
+                              break;
+                          case 'Zona 3':
+                              color = '#ff8b00';
+                              break;
+                          case 'Zona 2':
+                              color = '#ebbb01';
+                              break;
+                          case 'Zona 1':
+                              color = '#f4c591';
+                              break;
+                          case 'Zona 0':
+                              color = '#fef1c5';
+                              break;
+                          default:
+                              color = 'black';
+                      }
+                      return {
+                          color: color,
+                          weight: 0,
+                          fillOpacity: 0.7
+                      };
+                  },
+                  onEachFeature: function(feature, layer) {
+                      if (feature.properties && feature.properties.zona_sismo) {
+                          layer.bindPopup(feature.properties.zona_sismo);
+                      }
+                  }
+              }).addTo(map); // Añadir la capa de zonas sísmicas al mapa
 
-            // Almacenar el marcador en el objeto de markers usando el registro como clave
-            markers[sismo.registro] = marker;
-            sismo.marker = marker; // Agregar marcador al objeto sismo
-        });
+              // Agregar el control de capas
+              var baseLayers = {
+                  "OpenStreetMap": L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                      maxZoom: 20,
+                  }).addTo(map)
+              };
 
-        // Función para determinar el color según la magnitud
-        function getColor(magnitude) {
-            if (magnitude >= 9.0) return "darkpurple";
-            if (magnitude >= 8.0) return "purple";
-            if (magnitude >= 7.0) return "darkred";
-            if (magnitude >= 6.0) return "red";
-            if (magnitude >= 5.0) return "orange";
-            if (magnitude >= 4.0) return "darkgreen";
-            if (magnitude >= 3.0) return "green";
-            if (magnitude >= 2.0) return "cadetblue";
-            if (magnitude >= 1.0) return "blue";
-            return "lightgray";
-        }
+              var overlays = {
+                  "Zonas Sísmicas": geoJsonLayer // Añade tu capa GeoJSON aquí
+              };
+
+              L.control.layers(baseLayers, overlays).addTo(map); // Agrega el control al mapa
+
+              // Crear un FeatureGroup para los marcadores
+              markersLayer = L.featureGroup().addTo(map); // Agregar la capa de marcadores al mapa
+
+              // Cargar marcadores
+              cargarMarcadores();
+
+              // Manejar el evento de overlayadd
+              map.on('overlayadd', function(e) {
+                  if (e.name === 'Zonas Sísmicas') {
+                      // Asegurarse de que los marcadores estén visibles
+                      map.addLayer(markersLayer);
+                  }
+              });
+
+              // Manejar el evento de overlayremove
+              map.on('overlayremove', function(e) {
+                  if (e.name === 'Zonas Sísmicas') {
+                      // Asegurarse de que los marcadores estén visibles
+                      map.addLayer(markersLayer);
+                  }
+              });
+          })
+          .catch(error => {
+              console.error('Error al cargar el GeoJSON:', error);
+          });
+
+      // Función para agregar marcadores al mapa
+      function cargarMarcadores() {
+          // Agregar marcadores desde los datos del servidor
+          var sismos = {{ sismos | tojson }};
+
+          sismos.forEach(function(sismo) {
+              var coords = sismo.coordenadas.split(', ');
+              var lat = parseFloat(coords[0]);
+              var lon = parseFloat(coords[1]);
+              var popupContent = `
+                  <h2>${sismo.provincia}</h2>
+                  <h4>${sismo.registro}</h4>
+                  <h5>Magnitud: ${sismo.magnitud}</h5>
+                  <p>Epicentro: ${lat}º Sur; ${lon}º Oeste</p>
+                  <p>Profundidad: ${sismo.profundidad} km</p>
+              `;
+              var marker = L.circleMarker([lat, lon], {
+                  radius: 10,
+                  color: "black",
+                  weight: 1.2,
+                  fillColor: getColor(sismo.magnitud),
+                  fillOpacity: 0.7,
+                  pane: 'markerPane' // Añadir el pane a los marcadores
+              }).bindPopup(popupContent);
+
+              // Añadir el marcador al FeatureGroup de marcadores
+              markersLayer.addLayer(marker);
+          });
+      }
+
+      // Función para determinar el color según la magnitud
+      function getColor(magnitude) {
+          if (magnitude >= 9.0) return "black";
+          if (magnitude >= 8.0) return "purple";
+          if (magnitude >= 7.0) return "darkred";
+          if (magnitude >= 6.0) return "red";
+          if (magnitude >= 5.0) return "orange";
+          if (magnitude >= 4.0) return "darkgreen";
+          if (magnitude >= 3.0) return "green";
+          if (magnitude >= 2.0) return "cadetblue";
+          if (magnitude >= 1.0) return "blue";
+          return "lightgray";
+      }
+
 
         // Inicializar DataTable desactivando el ordenamiento
         $(document).ready(function() {
@@ -177,7 +291,13 @@
 
         // Añadir control de geocodificación
         var geocoder = L.Control.geocoder({
-            defaultMarkGeocode: false,
+            collapsed: true,
+            defaultMarkGeocode: true,
+            placeholder: "Buscar un sitio...",
+            position: "topleft",
+            provider: "nominatim",
+            providerOptions: {},
+            zoom: 11,
         })
         .on('markgeocode', function(e) {
             var latlng = e.geocode.center;
@@ -237,6 +357,31 @@
                   );
               },
           });
+
+
+
+
+          // Crear el control de leyenda
+          var legend = L.control({ position: 'bottomright' });
+
+          legend.onAdd = function (map) {
+              var div = L.DomUtil.create('div', 'info legend');
+              div.innerHTML += '<h5>Leyenda</h5>';
+              div.innerHTML += '<i style="background: #301934"></i> 9.0 y más<br>';
+              div.innerHTML += '<i style="background: #6A0E3D"></i> 8.0 - 8.9<br>';
+              div.innerHTML += '<i style="background: #8B0000"></i> 7.0 - 7.9<br>';
+              div.innerHTML += '<i style="background: #FF0000"></i> 6.0 - 6.9<br>';
+              div.innerHTML += '<i style="background: #FFA500"></i> 5.0 - 5.9<br>';
+              div.innerHTML += '<i style="background: #006400"></i> 4.0 - 4.9<br>';
+              div.innerHTML += '<i style="background: #008000"></i> 3.0 - 3.9<br>';
+              div.innerHTML += '<i style="background: #5F9EA0"></i> 2.0 - 2.9<br>';
+              div.innerHTML += '<i style="background: #0000FF"></i> 1.0 - 1.9<br>';
+              div.innerHTML += '<i style="background: #D3D3D3"></i> Menos de 1.0<br>';
+              return div;
+          };
+
+          // Agregar la leyenda al mapa
+          legend.addTo(map);
     </script>
   </body>
 </html>
