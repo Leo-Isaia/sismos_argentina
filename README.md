@@ -3,13 +3,11 @@
     <h1>Sismos Argentina</h1>
 </div>
 
-<br>
-
-# 🌎💥- Visualizador de Sismos - 😬 🇦🇷 ⚠️
-
-### Herramienta desarrollada con Python, Flask, HTML, CSS y JS 
-
-<br>
+<div align="center">
+    <h2>🌎💥- Visualizador de Sismos - 😬 🇦🇷 ⚠️</h2>
+    <br>
+    <h6>Herramienta desarrollada con Python, Flask, HTML, CSS y JS</h6>
+</div>
 
 <div align="center">
     <img src="https://github.com/Leo-Isaia/sismos_argentina/blob/main/static/ScreenCapture.png" alt="Captura de la Aplicación" style="width:100%;"/>
