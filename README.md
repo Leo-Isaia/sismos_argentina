@@ -5,7 +5,7 @@
 
 <br>
 
-# 🌎💥- Visualizador de Sismos de la República Argentina - 😬 🇦🇷 ⚠️
+# 🌎💥- Visualizador de Sismos - 😬 🇦🇷 ⚠️
 
 ### Herramienta desarrollada con Python, Flask, HTML, CSS y JS 
 
